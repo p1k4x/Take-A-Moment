@@ -18,7 +18,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": ["deb", "appimage", "nsis"],
     "publisher": "Take A Moment",
     "icon": ["icons/icon.ico", "icons/icon.png"],
     "resources": {

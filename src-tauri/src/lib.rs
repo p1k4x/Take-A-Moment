@@ -745,7 +745,6 @@ pub fn run() {
       ))?;
       let runtime = Runtime::new(app.handle().clone())?;
       runtime.start_scheduler();
-      #[cfg(windows)]
       start_session_monitor(runtime.clone());
       app.manage(runtime);
       create_tray(app.handle())?;
@@ -1227,7 +1226,19 @@ fn lock_pc() {
 }
 
 #[cfg(not(windows))]
-fn lock_pc() {}
+fn lock_pc() {
+  // Attempt to lock the *current* logind session.
+  // On many desktop setups `XDG_SESSION_ID` is present and matches logind's session id.
+  let session_id = match std::env::var("XDG_SESSION_ID") {
+    Ok(v) if !v.trim().is_empty() => v,
+    _ => return,
+  };
+
+  let mut cmd = Command::new("loginctl");
+  // Best-effort: don't block the break thread on failures.
+  cmd.args(["lock-session", &session_id]);
+  let _ = cmd.spawn();
+}
 
 #[cfg(windows)]
 fn is_idle(threshold_minutes: u32) -> bool {
@@ -1251,7 +1262,64 @@ fn is_idle(threshold_minutes: u32) -> bool {
 
 #[cfg(not(windows))]
 fn is_idle(_threshold_minutes: u32) -> bool {
-  false
+  // Use systemd-logind's idle hint for the current session.
+  // This is robust across desktops (GNOME/KDE/etc.) and doesn't require X11.
+  let session_id = match std::env::var("XDG_SESSION_ID") {
+    Ok(v) if !v.trim().is_empty() => v,
+    _ => return false,
+  };
+
+  let output = Command::new("loginctl")
+    .args([
+      "show-session",
+      &session_id,
+      "-p",
+      "IdleHint",
+      "-p",
+      "IdleSinceHint",
+    ])
+    .output();
+
+  let stdout = match output.ok().and_then(|o| String::from_utf8(o.stdout).ok()) {
+    Some(s) => s,
+    None => return false,
+  };
+
+  let mut idle_hint: Option<bool> = None;
+  let mut idle_since_hint_us: Option<u64> = None;
+
+  for line in stdout.lines() {
+    let Some((k, v)) = line.split_once('=') else { continue };
+    match k.trim() {
+      "IdleHint" => {
+        idle_hint = match v.trim().to_ascii_lowercase().as_str() {
+          "yes" => Some(true),
+          "no" => Some(false),
+          _ => None,
+        };
+      }
+      "IdleSinceHint" => {
+        idle_since_hint_us = v.trim().parse::<u64>().ok();
+      }
+      _ => {}
+    }
+  }
+
+  let Some(idle_hint) = idle_hint else { return false };
+  if !idle_hint {
+    return false;
+  }
+  let Some(idle_since_hint_us) = idle_since_hint_us else { return false };
+  if idle_since_hint_us == 0 {
+    return false;
+  }
+
+  let now_us = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_micros() as u64;
+  let idle_us = now_us.saturating_sub(idle_since_hint_us);
+  idle_us >= _threshold_minutes as u64 * 60 * 1_000_000
 }
 
 /// Adds CREATE_NO_WINDOW on Windows so shelling out to reg/powershell from the
@@ -1271,31 +1339,112 @@ fn configure_hidden(cmd: &mut Command) {
 /// a value of exactly `0x0` under the microphone/webcam consent stores means
 /// "still in use" (covers Teams, Zoom, Meet, etc.).
 fn is_media_in_use() -> bool {
-  if !cfg!(windows) {
+  if cfg!(windows) {
+    for device in ["microphone", "webcam"] {
+      let key = format!(
+        r"HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{device}"
+      );
+      let mut cmd = Command::new("reg");
+      cmd.args(["query", &key, "/s", "/v", "LastUsedTimeStop"]);
+      configure_hidden(&mut cmd);
+      let in_use = cmd
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| {
+          s.lines().any(|line| {
+            line.contains("LastUsedTimeStop")
+              && line.split_whitespace().last() == Some("0x0")
+          })
+        })
+        .unwrap_or(false);
+      if in_use {
+        return true;
+      }
+    }
     return false;
   }
-  for device in ["microphone", "webcam"] {
-    let key = format!(
-      r"HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{device}"
-    );
-    let mut cmd = Command::new("reg");
-    cmd.args(["query", &key, "/s", "/v", "LastUsedTimeStop"]);
-    configure_hidden(&mut cmd);
-    let in_use = cmd
-      .output()
-      .ok()
-      .and_then(|o| String::from_utf8(o.stdout).ok())
-      .map(|s| {
-        s.lines().any(|line| {
-          line.contains("LastUsedTimeStop") && line.split_whitespace().last() == Some("0x0")
-        })
-      })
-      .unwrap_or(false);
-    if in_use {
-      return true;
-    }
+
+  // Linux: best-effort detection.
+  // We look for any process holding an open file descriptor to common camera/mic devices.
+  // This is necessarily approximate, but it works across most setups without extra deps.
+  //
+  // Throttle checks to avoid scanning /proc too frequently.
+  use std::sync::{Mutex, OnceLock};
+  struct MediaCache {
+    last_check_ms: u64,
+    last_value: bool,
   }
-  false
+  static CACHE: OnceLock<Mutex<MediaCache>> = OnceLock::new();
+
+  let cache = CACHE.get_or_init(|| Mutex::new(MediaCache {
+    last_check_ms: 0,
+    last_value: false,
+  }));
+
+  let now_ms = now_ms();
+  {
+    let mut guard = cache.lock().unwrap();
+    if guard.last_check_ms != 0 && now_ms.saturating_sub(guard.last_check_ms) < 1_500 {
+      return guard.last_value;
+    }
+
+    let mut in_use = false;
+    let proc_dir = match std::fs::read_dir("/proc") {
+      Ok(d) => d,
+      Err(_) => {
+        guard.last_check_ms = now_ms;
+        guard.last_value = false;
+        return false;
+      }
+    };
+
+    for entry in proc_dir {
+      let Ok(entry) = entry else { continue };
+      let pid_name = entry.file_name();
+      let pid_str = match pid_name.to_str() {
+        Some(s) => s,
+        None => continue,
+      };
+      if pid_str.is_empty() || !pid_str.chars().all(|c| c.is_ascii_digit()) {
+        continue;
+      }
+      let fd_dir = format!("/proc/{pid_str}/fd");
+      let Ok(fds) = std::fs::read_dir(&fd_dir) else { continue };
+
+      for fd in fds.flatten() {
+        let Ok(target) = std::fs::read_link(fd.path()) else { continue };
+        let target_str = target.to_string_lossy();
+
+        // Camera devices are usually /dev/video*.
+        if target_str.starts_with("/dev/video") {
+          in_use = true;
+          break;
+        }
+
+        // Microphones often go through /dev/snd/* or sound control nodes.
+        if target_str.starts_with("/dev/snd/") {
+          in_use = true;
+          break;
+        }
+
+        // PipeWire/Pulse sockets show up as paths somewhere under /run/user/$UID.
+        if target_str.contains("pipewire-0")
+          || target_str.contains("/pulse/native")
+        {
+          in_use = true;
+          break;
+        }
+      }
+      if in_use {
+        break;
+      }
+    }
+
+    guard.last_check_ms = now_ms;
+    guard.last_value = in_use;
+    in_use
+  }
 }
 
 // Block synchronously on a WinRT IAsyncOperation<T>.
@@ -1365,7 +1514,43 @@ fn pause_system_media() -> Vec<String> {
 
 #[cfg(not(windows))]
 fn pause_system_media() -> Vec<String> {
-  Vec::new()
+  // Linux: use MPRIS via `playerctl`.
+  // If playerctl isn't available, we can't pause/resume and will no-op.
+  let list_output = match Command::new("playerctl").args(["-l"]).output() {
+    Ok(o) => o,
+    Err(_) => return Vec::new(),
+  };
+  let players = match String::from_utf8(list_output.stdout) {
+    Ok(s) => s,
+    Err(_) => return Vec::new(),
+  };
+  let players: Vec<String> = players
+    .lines()
+    .map(|s| s.trim())
+    .filter(|s| !s.is_empty())
+    .map(|s| s.to_string())
+    .collect();
+
+  if players.is_empty() {
+    return Vec::new();
+  }
+
+  let mut paused = Vec::new();
+  for player in players {
+    let status_out = Command::new("playerctl")
+      .args(["-p", &player, "status"])
+      .output()
+      .ok();
+    let Some(status_out) = status_out else { continue };
+    let status = String::from_utf8(status_out.stdout).ok().unwrap_or_default();
+    if status.trim().eq_ignore_ascii_case("Playing") {
+      let _ = Command::new("playerctl")
+        .args(["-p", &player, "pause"])
+        .output();
+      paused.push(player);
+    }
+  }
+  paused
 }
 
 // Resume only the sessions that pause_system_media paused.
@@ -1407,7 +1592,19 @@ fn resume_system_media(sessions_to_resume: Vec<String>) {
 }
 
 #[cfg(not(windows))]
-fn resume_system_media(_sessions_to_resume: Vec<String>) {}
+fn resume_system_media(sessions_to_resume: Vec<String>) {
+  if sessions_to_resume.is_empty() {
+    return;
+  }
+
+  thread::spawn(move || {
+    for player in sessions_to_resume {
+      let _ = Command::new("playerctl")
+        .args(["-p", &player, "play"])
+        .output();
+    }
+  });
+}
 
 // ─── Lock-screen guard (Windows session lock/unlock) ─────────────────────────
 // Breaks should not fire over the lock screen (the user can't dismiss them) and
@@ -1500,6 +1697,51 @@ fn start_session_monitor(runtime: Arc<Runtime>) {
     while GetMessageW(&mut msg, Some(hwnd), 0, 0).0 > 0 {
       let _ = TranslateMessage(&msg);
       DispatchMessageW(&msg);
+    }
+  });
+}
+
+#[cfg(not(windows))]
+fn start_session_monitor(runtime: Arc<Runtime>) {
+  // Linux: best-effort polling based on logind's `LockedHint`.
+  // Polling keeps the implementation dependency-free and works across desktops.
+  thread::spawn(move || {
+    let session_id = match std::env::var("XDG_SESSION_ID") {
+      Ok(v) if !v.trim().is_empty() => v,
+      _ => return,
+    };
+
+    let mut last_locked: Option<bool> = None;
+
+    loop {
+      let locked = Command::new("loginctl")
+        .args(["show-session", &session_id, "-p", "LockedHint"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|stdout| {
+          stdout
+            .lines()
+            .find_map(|line| line.split_once('=').map(|(_, v)| v.trim().to_string()))
+        })
+        .and_then(|v| match v.to_ascii_lowercase().as_str() {
+          "yes" => Some(true),
+          "no" => Some(false),
+          _ => None,
+        });
+
+      if let Some(locked) = locked {
+        if last_locked.map(|prev| prev != locked).unwrap_or(true) {
+          if locked {
+            runtime.lock_screen();
+          } else {
+            runtime.unlock_screen();
+          }
+          last_locked = Some(locked);
+        }
+      }
+
+      thread::sleep(Duration::from_secs(2));
     }
   });
 }

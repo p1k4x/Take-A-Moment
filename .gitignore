@@ -4,6 +4,10 @@ out/
 release/
 src-tauri/target/
 src-tauri/gen/
+# Workspace-local rustup/cargo installs (do not commit).
+# Keep this rooted so src-tauri/.cargo/config.toml is still tracked.
+/.cargo/
+/.rustup/
 *.tsbuildinfo
 .DS_Store
 *.log
