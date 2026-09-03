@@ -76,3 +76,11 @@ npm run package
 
 The app uses Tauri v2. The idle tray process is native Rust; Settings and the
 fullscreen break overlay are Vite/React webviews created on demand.
+
+## Linux / Ubuntu 24 (this fork)
+
+Upstream is Windows-only. This repository is a fork that is adding Ubuntu 24
+support. That work is **not finished**.
+
+See [docs/ubuntu-24-port.md](docs/ubuntu-24-port.md) for what already landed,
+what still needs a native Ubuntu machine, and how to continue.
