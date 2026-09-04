@@ -59,7 +59,7 @@ sudo apt update
 sudo apt install -y \
   libwebkit2gtk-4.1-dev \
   libgtk-3-dev \
-  libappindicator3-dev \
+  libayatana-appindicator3-dev \
   librsvg2-dev \
   libdbus-1-dev \
   pkg-config \
@@ -68,8 +68,14 @@ sudo apt install -y \
   wget \
   file \
   libssl-dev \
-  playerctl
+  libxdo-dev \
+  playerctl \
+  gstreamer1.0-plugins-bad
 ```
+
+On Ubuntu 24, use `libayatana-appindicator3-dev` (not `libappindicator3-dev`). The legacy package conflicts with `libayatana-appindicator3-1`, which GNOME already ships.
+
+`gstreamer1.0-plugins-bad` silences WebKit’s WebVTT encoder warning when Fat Cat WebMs play (no subtitles are used; VP9 decode itself comes from `plugins-good`).
 
 Rust in your home directory:
 
