@@ -32,7 +32,7 @@ Commit `2543b02` is a starting slice, not a finished Linux product.
 | Pause/resume media | `playerctl` (MPRIS) | Implemented, untested; no-ops if missing |
 | Camera/mic in use | Scan `/proc/*/fd` for `/dev/video*`, `/dev/snd/`, PipeWire/Pulse sockets | Rough; likely false positives |
 | Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | Configured, not produced in WSL |
-| Tray + overlay | Same Tauri code paths as Windows | Frontend `npm run build` works; full `tauri dev` not run on Ubuntu 24 yet |
+| Tray + overlay | Same Tauri code paths as Windows | Validated on Ubuntu 24 GNOME Wayland ([TMP-4](https://pikachurro.atlassian.net/browse/TMP-4)); X11 and other GPUs still open |
 
 Windows behaviour is meant to stay unchanged (`#[cfg(windows)]` paths).
 
@@ -77,7 +77,9 @@ On Ubuntu 24, use `libayatana-appindicator3-dev` (not `libappindicator3-dev`). T
 
 `gstreamer1.0-plugins-bad` silences WebKit’s WebVTT encoder warning when Fat Cat WebMs play (no subtitles are used; VP9 decode itself comes from `plugins-good`).
 
-The Fat Cat clips are 1080p VP9-with-alpha. WebKitGTK’s DMA-BUF renderer cannot map that format and can freeze the overlay (`_dma_fmt_to_dma_drm_fmts` / `GST_VIDEO_FORMAT_UNKNOWN`). [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) found this on an Intel+NVIDIA hybrid under GNOME Wayland. The Linux binary sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` for all Linux sessions (Wayland and X11) unless already set, plus `__NV_DISABLE_EXPLICIT_SYNC=1` when NVIDIA + Wayland. That is a pragmatic default, not the target: overlay must stay usable beyond this GPU combo, on Wayland **and** X11 ([TMP-12](https://pikachurro.atlassian.net/browse/TMP-12), [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13)).
+[TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) is tray / settings / overlay validation on Ubuntu 24 (done on this GNOME Wayland hybrid). It is not a graphics-format ticket.
+
+The Fat Cat overlay freeze found during that check is separate: the clips are 1080p VP9-**with-alpha** so the cat can sit on a transparent background. WebKitGTK’s DMA-BUF renderer cannot map that format (`_dma_fmt_to_dma_drm_fmts` / `GST_VIDEO_FORMAT_UNKNOWN`). The Linux binary sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` for all Linux sessions unless already set, plus `__NV_DISABLE_EXPLICIT_SYNC=1` when NVIDIA + Wayland. That workaround is a pragmatic default. Keeping alpha working on more than this GPU combo, and on X11 as well as Wayland, is [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) and [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12).
 
 Rust in your home directory:
 

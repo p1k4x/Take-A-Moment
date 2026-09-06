@@ -19,15 +19,15 @@ fn main() {
   take_a_moment_lib::run()
 }
 
-/// Fat Cat plays 1080p VP9-with-alpha WebMs. WebKitGTK's DMA-BUF renderer cannot
-/// map that pixel format (GStreamer asserts `fmt != GST_VIDEO_FORMAT_UNKNOWN`),
-/// which froze the overlay on Ubuntu 24 Wayland (TMP-4, Intel+NVIDIA hybrid).
+/// Fat Cat uses 1080p VP9-with-alpha so the cat can sit on a transparent
+/// background. That alpha format is what WebKitGTK's DMA-BUF renderer cannot
+/// map (GStreamer `fmt != GST_VIDEO_FORMAT_UNKNOWN`), which froze the overlay
+/// during TMP-4 validation — TMP-4 itself is only tray/settings/overlay checks.
 ///
 /// `WEBKIT_DISABLE_DMABUF_RENDERER` is a Linux-wide pragmatic default so X11 and
 /// other GPUs get the same freeze fix; `__NV_DISABLE_EXPLICIT_SYNC` is only the
-/// NVIDIA+Wayland explicit-sync quirk. Long-term the overlay must work on more
-/// than this machine — Intel-only, AMD, discrete NVIDIA, Wayland *and* X11 —
-/// and we should narrow this if DMA-BUF is viable. See TMP-12 and TMP-13.
+/// NVIDIA+Wayland explicit-sync quirk. Long-term alpha overlay must work on more
+/// than this Intel+NVIDIA Wayland laptop. See TMP-12 (X11) and TMP-13 (GPUs).
 /// tauri-apps/tauri#9394
 #[cfg(target_os = "linux")]
 fn apply_linux_webkit_workarounds() {
