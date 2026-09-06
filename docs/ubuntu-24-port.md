@@ -81,6 +81,8 @@ On Ubuntu 24, use `libayatana-appindicator3-dev` (not `libappindicator3-dev`). T
 
 The Fat Cat overlay freeze found during that check is separate: the clips are 1080p VP9-**with-alpha** so the cat can sit on a transparent background. WebKitGTK’s DMA-BUF renderer cannot map that format (`_dma_fmt_to_dma_drm_fmts` / `GST_VIDEO_FORMAT_UNKNOWN`). The Linux binary sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` for all Linux sessions unless already set, plus `__NV_DISABLE_EXPLICIT_SYNC=1` when NVIDIA + Wayland. That workaround is a pragmatic default. Keeping alpha working on more than this GPU combo, and on X11 as well as Wayland, is [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) and [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12).
 
+WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay (src-swap shows one stretched opaque frame, then stalls). HTML `loop` and `play()` after `ended` are ignored. On Linux the overlay therefore plays **only** `neko2`, rewinds just before the last frame so it repeats, and still uses the CSS slide-in. The ~11s `neko1` intro is skipped until [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14). Intro→loop handover stays on Windows.
+
 Rust in your home directory:
 
 ```bash
@@ -107,7 +109,7 @@ Expect bundles under `src-tauri/target/release/bundle/` (`deb` and `appimage`).
 ## Suggested next checks (TMP)
 
 1. [TMP-8](https://pikachurro.atlassian.net/browse/TMP-8) / [TMP-9](https://pikachurro.atlassian.net/browse/TMP-9) — install deps, `cargo check` on Linux
-2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray, settings, overlay on this Wayland hybrid (done); [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) X11; [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) other GPUs
+2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray, settings, overlay on this Wayland hybrid (done); [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) X11; [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) other GPUs; [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14) Fat Cat intro→loop
 3. [TMP-11](https://pikachurro.atlassian.net/browse/TMP-11) / [TMP-5](https://pikachurro.atlassian.net/browse/TMP-5) / [TMP-10](https://pikachurro.atlassian.net/browse/TMP-10) — idle, lock/unlock, lock-after-break
 4. [TMP-6](https://pikachurro.atlassian.net/browse/TMP-6) / [TMP-7](https://pikachurro.atlassian.net/browse/TMP-7) — media and camera/mic (replace the `/proc` scan if it is noisy)
 5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — install/uninstall a `.deb` on Ubuntu 24

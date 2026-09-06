@@ -564,7 +564,11 @@ impl Runtime {
       let label = format!("overlay-{i}");
       let pos = monitor.position();
       let size = monitor.size();
-      let url = format!("overlay/index.html?label={label}");
+      let url = if cfg!(target_os = "linux") {
+        format!("overlay/index.html?label={label}&linux=1")
+      } else {
+        format!("overlay/index.html?label={label}")
+      };
       let window = WebviewWindowBuilder::new(&self.app, &label, WebviewUrl::App(url.into()))
       .title("Take A Moment")
       .decorations(false)
