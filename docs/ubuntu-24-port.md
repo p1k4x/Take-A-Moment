@@ -77,6 +77,8 @@ On Ubuntu 24, use `libayatana-appindicator3-dev` (not `libappindicator3-dev`). T
 
 `gstreamer1.0-plugins-bad` silences WebKit’s WebVTT encoder warning when Fat Cat WebMs play (no subtitles are used; VP9 decode itself comes from `plugins-good`).
 
+The Fat Cat clips are 1080p VP9-with-alpha. WebKitGTK’s DMA-BUF renderer cannot map that format and can freeze the overlay (`_dma_fmt_to_dma_drm_fmts` / `GST_VIDEO_FORMAT_UNKNOWN`). [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) found this on an Intel+NVIDIA hybrid under GNOME Wayland. The Linux binary sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` for all Linux sessions (Wayland and X11) unless already set, plus `__NV_DISABLE_EXPLICIT_SYNC=1` when NVIDIA + Wayland. That is a pragmatic default, not the target: overlay must stay usable beyond this GPU combo, on Wayland **and** X11 ([TMP-12](https://pikachurro.atlassian.net/browse/TMP-12), [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13)).
+
 Rust in your home directory:
 
 ```bash
@@ -103,7 +105,7 @@ Expect bundles under `src-tauri/target/release/bundle/` (`deb` and `appimage`).
 ## Suggested next checks (TMP)
 
 1. [TMP-8](https://pikachurro.atlassian.net/browse/TMP-8) / [TMP-9](https://pikachurro.atlassian.net/browse/TMP-9) — install deps, `cargo check` on Linux
-2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray icon, settings window, overlay, multi-monitor
+2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray, settings, overlay on this Wayland hybrid (done); [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) X11; [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) other GPUs
 3. [TMP-11](https://pikachurro.atlassian.net/browse/TMP-11) / [TMP-5](https://pikachurro.atlassian.net/browse/TMP-5) / [TMP-10](https://pikachurro.atlassian.net/browse/TMP-10) — idle, lock/unlock, lock-after-break
 4. [TMP-6](https://pikachurro.atlassian.net/browse/TMP-6) / [TMP-7](https://pikachurro.atlassian.net/browse/TMP-7) — media and camera/mic (replace the `/proc` scan if it is noisy)
 5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — install/uninstall a `.deb` on Ubuntu 24

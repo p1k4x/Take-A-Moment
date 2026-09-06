@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react'
 
 function getVideoUrl(filename: string): string {
   return new URL(`../videos/${filename}`, location.href).href
@@ -23,18 +23,34 @@ export function FatCatBackground() {
   const loopRef = useRef<HTMLVideoElement>(null)
   const [showLoop, setShowLoop] = useState(false)
   const [hideIntro, setHideIntro] = useState(false)
+  const [loopMounted, setLoopMounted] = useState(false)
+
+  const handleIntroTimeUpdate = (event: SyntheticEvent<HTMLVideoElement>) => {
+    if (loopMounted) return
+    const video = event.currentTarget
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return
+    // Decode only one 1080p VP9-alpha stream during the slide-in; mount the
+    // loop clip shortly before the intro ends so handover can still be seamless.
+    if (video.duration - video.currentTime <= 1.5) {
+      setLoopMounted(true)
+    }
+  }
 
   const handleIntroEnded = () => {
-    const loop = loopRef.current
-    if (loop) {
-      loop.currentTime = 0
-      void loop.play()
-    }
+    setLoopMounted(true)
     setShowLoop(true)
     // One frame of overlap (imperceptible) before removing the intro —
     // this is the original cat-gatekeeper's own handover technique.
     requestAnimationFrame(() => setHideIntro(true))
   }
+
+  useEffect(() => {
+    if (!showLoop) return
+    const loop = loopRef.current
+    if (!loop) return
+    loop.currentTime = 0
+    void loop.play()
+  }, [showLoop, loopMounted])
 
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
@@ -43,18 +59,21 @@ export function FatCatBackground() {
         autoPlay
         muted
         playsInline
+        onTimeUpdate={handleIntroTimeUpdate}
         onEnded={handleIntroEnded}
         style={videoStyle(!hideIntro)}
       />
-      <video
-        ref={loopRef}
-        src={getVideoUrl('neko2.webm')}
-        muted
-        playsInline
-        loop
-        preload="auto"
-        style={videoStyle(showLoop)}
-      />
+      {loopMounted && (
+        <video
+          ref={loopRef}
+          src={getVideoUrl('neko2.webm')}
+          muted
+          playsInline
+          loop
+          preload="auto"
+          style={videoStyle(showLoop)}
+        />
+      )}
     </div>
   )
 }

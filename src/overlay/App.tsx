@@ -35,6 +35,7 @@ export function App() {
   const [language, setLanguage] = useState<Language>('sv')
   const [theme, setTheme] = useState('still-garden')
   const [breakBackground, setBreakBackground] = useState<AppSettings['breakBackground']>('default')
+  const [exiting, setExiting] = useState(false)
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const readyForBreakRef = useRef<string | null>(null)
   const t = useStrings(language)
@@ -64,6 +65,7 @@ export function App() {
   const prepareBreak = useCallback(async (b: ActiveBreak) => {
     breakDataRef.current = b
     setBreakData(b)
+    setExiting(false)
     setArmed(true)
     setVisible(false)
     startTick(b.endsAt)
@@ -100,16 +102,22 @@ export function App() {
 
     const offEnd = window.api.onBreakEnd(() => {
       if (IS_AUDIO_OWNER && breakDataRef.current) playSound(breakDataRef.current.reminder.soundEnd, breakDataRef.current.reminder.volume)
-      // Unmount the overlay so AnimatePresence plays the radial "exit" variant.
-      // Do NOT setVisible(false) first — that collapses the overlay with the
-      // clip-path wipe and pre-empts the radial circle exit animation.
-      setArmed(false)
-      setTimeout(() => {
-        setVisible(false)
-        setBreakData(null)
-        breakDataRef.current = null
-        readyForBreakRef.current = null
-      }, 600)
+      // Paint overlayExiting (re-enable the radial mask) before AnimatePresence
+      // unmounts — a batched setArmed(false) would skip that class on the
+      // exiting snapshot and freeze Fat Cat's CSS mask off during the wipe.
+      setExiting(true)
+      requestAnimationFrame(() => {
+        // Unmount the overlay so AnimatePresence plays the radial "exit" variant.
+        // Do NOT setVisible(false) first — that collapses the overlay with the
+        // clip-path wipe and pre-empts the radial circle exit animation.
+        setArmed(false)
+        setTimeout(() => {
+          setVisible(false)
+          setBreakData(null)
+          breakDataRef.current = null
+          readyForBreakRef.current = null
+        }, 600)
+      })
       if (tickRef.current) clearInterval(tickRef.current)
     })
 
@@ -193,7 +201,7 @@ export function App() {
     <AnimatePresence>
       {armed && breakData && (
         <motion.div
-          className={`${styles.overlay} ${isDarkBg ? styles.overlayDark : ''}`}
+          className={`${styles.overlay} ${isDarkBg ? styles.overlayDark : ''} ${isFatCat ? styles.overlayFatCat : ''} ${exiting ? styles.overlayExiting : ''}`}
           variants={overlayVariants}
           initial="hidden"
           animate={visible ? 'visible' : 'hidden'}

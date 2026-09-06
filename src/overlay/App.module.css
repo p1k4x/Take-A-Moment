@@ -43,6 +43,14 @@
   inset: 0;
 }
 
+/* The radial mask is a no-op while --hole-pct is -20, but WebKitGTK still
+   composites it every video frame. Drop it during Fat Cat playback and put
+   it back only for the shared radial exit wipe. */
+.overlayFatCat:not(.overlayExiting) {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
 /* Subtle dark veil over animated bg for text legibility */
 .bgVeil {
   position: absolute;
