@@ -113,3 +113,16 @@ Expect bundles under `src-tauri/target/release/bundle/` (`deb` and `appimage`).
 3. [TMP-11](https://pikachurro.atlassian.net/browse/TMP-11) / [TMP-5](https://pikachurro.atlassian.net/browse/TMP-5) / [TMP-10](https://pikachurro.atlassian.net/browse/TMP-10) — idle, lock/unlock, lock-after-break
 4. [TMP-6](https://pikachurro.atlassian.net/browse/TMP-6) / [TMP-7](https://pikachurro.atlassian.net/browse/TMP-7) — media and camera/mic (replace the `/proc` scan if it is noisy)
 5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — install/uninstall a `.deb` on Ubuntu 24
+
+## After Ubuntu 24 is stable (long-term)
+
+Do not expand [TMP-1](https://pikachurro.atlassian.net/browse/TMP-1) for this. File a new epic only once the Ubuntu 24 port is actually stable.
+
+Linux stays a **tray host**, same as Windows: idle process, Settings and overlay on demand. There is no window-only mode for WSL or for sessions without a panel. WSL can build and edit; it cannot run the product (no StatusNotifier/AppIndicator host). Optional later hardening is “log and keep going if tray creation fails,” not a second UX.
+
+Intended follow-on targets, in order:
+
+1. **Linux Mint (Cinnamon)** — X11 by default, native panel tray. Natural re-check of tray clicks, transparent fullscreen overlay under Cinnamon’s window manager, and `loginctl` idle/lock via cinnamon-screensaver. Mint can use the Ubuntu `.deb`.
+2. **Fedora Cinnamon** — same desktop, different distro. Re-check packages, AppImage (no `.deb`), and idle/lock/overlay again.
+
+When that epic is opened, split tickets from what Ubuntu 24 already proved. Do not re-spec idle, lock, or overlay as unknown work.
