@@ -60,8 +60,10 @@ Silent install with a specific language:
 
 ## Development
 
+Windows (upstream-style):
+
 ```
-git clone https://github.com/Karlmit/Take-A-Moment.git
+git clone https://github.com/p1k4x/Take-A-Moment.git
 cd Take-A-Moment
 npm install
 npm run dev
@@ -71,16 +73,24 @@ Build installer:
 
 ```
 npm run package
-# Output: release/Take A Moment Setup x.x.x.exe
+# Windows: release/Take A Moment Setup x.x.x.exe
+# Linux: src-tauri/target/release/bundle/ (deb + AppImage)
 ```
 
 The app uses Tauri v2. The idle tray process is native Rust; Settings and the
 fullscreen break overlay are Vite/React webviews created on demand.
 
-## Linux / Ubuntu 24 (this fork)
+## Linux / Ubuntu 24 / Linux Mint 22 (this fork)
 
 Upstream is Windows-only. This repository is a fork that is adding Ubuntu 24
-support. That work is **not finished**.
+support (Linux Mint 22.x uses the same packages). That work is **not finished**.
 
-See [docs/ubuntu-24-port.md](docs/ubuntu-24-port.md) for what already landed,
-what still needs a native Ubuntu machine, and how to continue.
+Linux Mint 22.3 Cinnamon (X11) **builds and runs this tree as-is** — no Mint
+fork. The tray overlay comes up transparent; the Fat Cat clip does not play;
+the theme background is sluggish. That is overlay/WebKit work, not a missing
+distro port. See [docs/ubuntu-24-port.md](docs/ubuntu-24-port.md).
+
+`npm` and `cargo` are **not** on a stock Mint/Ubuntu desktop. Do not run
+`sudo apt install npm` — that installs EOL Node 18. Install Node 22 via nvm,
+rustup, then Tauri GTK/WebKit packages, then `npm ci`. Full order, package
+list, and the errors you hit if you skip a step are in that same doc.

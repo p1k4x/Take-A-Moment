@@ -32,7 +32,7 @@ Commit `2543b02` is a starting slice, not a finished Linux product.
 | Pause/resume media | `playerctl` (MPRIS) | Implemented, untested; no-ops if missing |
 | Camera/mic in use | Scan `/proc/*/fd` for `/dev/video*`, `/dev/snd/`, PipeWire/Pulse sockets | Rough; likely false positives |
 | Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | Configured, not produced in WSL |
-| Tray + overlay | Same Tauri code paths as Windows | Validated on Ubuntu 24 GNOME Wayland ([TMP-4](https://pikachurro.atlassian.net/browse/TMP-4)); X11 and other GPUs still open |
+| Tray + overlay | Same Tauri code paths as Windows | Validated on Ubuntu 24 GNOME Wayland ([TMP-4](https://pikachurro.atlassian.net/browse/TMP-4)). Linux Mint 22.3 Cinnamon X11 **builds and launches** with that same code (see below). Overlay window is transparent; Fat Cat video does not play; theme background is sluggish. X11/GPU polish still [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) / [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13). |
 
 Windows behaviour is meant to stay unchanged (`#[cfg(windows)]` paths).
 
@@ -44,7 +44,15 @@ A rustup toolchain was temporarily installed **inside the repo** (`.cargo/`, `.r
 
 `npm ci` and `npm run build` succeeded. `npm run dev` / a real tray+overlay session did not.
 
-## Continue on a native Ubuntu 24 host
+## Continue on Ubuntu 24.04 or Linux Mint 22.x
+
+Linux Mint 22.3 (Zena, Cinnamon) is Ubuntu 24.04 Noble underneath. The **toolchain** is the same as Ubuntu 24: Node, rustup, then Tauri GTK/WebKit packages, then `npm ci`. Cinnamon does not need a different package list or extra Rust. A Precision M2800 on Mint 22.3 Cinnamon **X11** compiled and launched this tree as-is (`npm run dev` → `target/debug/take-a-moment`). Overlay *behaviour* is not the same as the GNOME Wayland check — that is the remaining product work, not a Mint fork.
+
+A machine with only a desktop install will fail immediately: no `npm`, no `cargo`, and `npm run dev` cannot find the Tauri CLI until `node_modules` exists.
+
+Do the steps **in this order**. Skipping Node or Rust is what produces the errors at the bottom of this section.
+
+### 1. Clone
 
 ```bash
 git clone https://github.com/p1k4x/Take-A-Moment.git
@@ -52,7 +60,46 @@ cd Take-A-Moment
 git remote add upstream https://github.com/Karlmit/Take-A-Moment.git
 ```
 
-System packages (Tauri v2 on Ubuntu 24):
+`gh repo clone p1k4x/Take-A-Moment` is the same clone. `gh` may set Karlmit as the default GitHub repo because of `upstream`; that does not change `git remote`. From inside the clone, `git remote -v` should show `origin` → p1k4x and `upstream` → Karlmit.
+
+### 2. Node.js (do not use `apt install npm`)
+
+`sudo apt install npm` on Mint/Ubuntu 24 pulls **Node 18** (end-of-life) plus Debian’s **npm 9** and hundreds of `node-*` packages. That satisfies the `npm: not found` hint, but it is the wrong Node for this project. Tauri v2 + Vite 5 want a current Node LTS (22 or 24).
+
+Install [nvm](https://github.com/nvm-sh/nvm) in your home directory, then Node 22 LTS:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.7/install.sh | bash
+# close the terminal and open a new one, or:
+source "$HOME/.nvm/nvm.sh"
+nvm install 22
+nvm alias default 22
+node -v   # v22.x
+npm -v
+```
+
+If you already ran `sudo apt install npm`, leave those packages for now. After nvm is sourced, `which node` should be under `~/.nvm/`, not `/usr/bin/node`. Re-run `npm ci` with that Node. Removing the distro packages later is optional: `sudo apt remove npm nodejs` (only after nvm works).
+
+Do not run `npm audit fix` as part of setup. It rewrites `package-lock.json` and is not required to build.
+
+### 3. Rust (cargo)
+
+`npm run dev` shells out to `cargo metadata`. Without rustup you get `No such file or directory (os error 2)` for `cargo`.
+
+Install rustup in `$HOME` (not inside the repo):
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+rustc --version
+cargo --version
+```
+
+The default (`stable`, proceed with 1) is enough. Do not copy WSL `.cargo/` / `.rustup/` directories from an old checkout.
+
+### 4. System packages (Tauri v2)
+
+Same list on Ubuntu 24.04 GNOME and Linux Mint 22.x Cinnamon:
 
 ```bash
 sudo apt update
@@ -73,24 +120,15 @@ sudo apt install -y \
   gstreamer1.0-plugins-bad
 ```
 
-On Ubuntu 24, use `libayatana-appindicator3-dev` (not `libappindicator3-dev`). The legacy package conflicts with `libayatana-appindicator3-1`, which GNOME already ships.
+Use `libayatana-appindicator3-dev` (not `libappindicator3-dev`). The legacy package conflicts with `libayatana-appindicator3-1`, which both GNOME and Cinnamon already ship. Cinnamon’s panel hosts StatusNotifier/AppIndicator; that is why the tray can work on Mint without a GNOME extension.
 
 `gstreamer1.0-plugins-bad` silences WebKit’s WebVTT encoder warning when Fat Cat WebMs play (no subtitles are used; VP9 decode itself comes from `plugins-good`).
 
-[TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) is tray / settings / overlay validation on Ubuntu 24 (done on this GNOME Wayland hybrid). It is not a graphics-format ticket.
+If `cargo check` later complains about missing `.pc` files (`glib-2.0`, `gdk-3.0`, `webkit2gtk-4.1`, `dbus-1`, …), this apt block was skipped or incomplete.
 
-The Fat Cat overlay freeze found during that check is separate: the clips are 1080p VP9-**with-alpha** so the cat can sit on a transparent background. WebKitGTK’s DMA-BUF renderer cannot map that format (`_dma_fmt_to_dma_drm_fmts` / `GST_VIDEO_FORMAT_UNKNOWN`). The Linux binary sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` for all Linux sessions unless already set, plus `__NV_DISABLE_EXPLICIT_SYNC=1` when NVIDIA + Wayland. That workaround is a pragmatic default. Keeping alpha working on more than this GPU combo, and on X11 as well as Wayland, is [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) and [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12).
+### 5. Project deps and run
 
-WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay (src-swap shows one stretched opaque frame, then stalls). HTML `loop` and `play()` after `ended` are ignored. On Linux the overlay therefore plays **only** `neko2`, rewinds just before the last frame so it repeats, and still uses the CSS slide-in. The ~11s `neko1` intro is skipped until [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14). Intro→loop handover stays on Windows.
-
-Rust in your home directory:
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source "$HOME/.cargo/env"
-```
-
-Then:
+`tauri` is not a system binary. It comes from `@tauri-apps/cli` in `node_modules` after install. `npm run dev` before that is `sh: 1: tauri: not found`.
 
 ```bash
 npm ci
@@ -98,18 +136,51 @@ cargo check --manifest-path src-tauri/Cargo.toml
 npm run dev
 ```
 
+`npm ci` needs a committed `package-lock.json` and matches CI. `npm install` also works on a dirty tree.
+
 Linux installer artifacts:
 
 ```bash
 npm run package
 ```
 
-Expect bundles under `src-tauri/target/release/bundle/` (`deb` and `appimage`).
+Expect bundles under `src-tauri/target/release/bundle/` (`deb` and `appimage`). Mint can install the Ubuntu `.deb`.
+
+### Errors this bootstrap is meant to prevent
+
+| What you see | Cause | Fix |
+|---|---|---|
+| `Command 'npm' not found` / apt suggests `sudo apt install npm` | Node was never installed | nvm + Node 22, **not** `apt install npm` |
+| `sh: 1: tauri: not found` | `npm run dev` before `npm ci` / `npm install` | `npm ci`, then `npm run dev` |
+| `failed to run 'cargo metadata' … No such file or directory` | rustup / `cargo` not on `PATH` | rustup, then `source "$HOME/.cargo/env"` |
+| `Package glib-2.0 was not found` / similar `.pc` errors | Tauri GTK/WebKit apt packages missing | step 4 |
+
+### Runtime notes (after it actually launches)
+
+[TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) is tray / settings / overlay validation on Ubuntu 24 (done on a GNOME Wayland hybrid). It is not a graphics-format ticket.
+
+#### Linux Mint 22.3 Cinnamon X11 (first run, no extra code)
+
+Same Ubuntu 24 tree, no Mint-specific changes. After rustup + the apt list above, `cargo check` / `npm run dev` succeeded and the debug binary ran.
+
+Observed on Preview break (not a full TMP-12 pass):
+
+- The fullscreen overlay **does** come up under muffin. The window looks **transparent** (no cat, glass/empty overlay).
+- The **Fat Cat clip does not play** (no walking cat). On GNOME Wayland, Linux still plays `neko2` with `WEBKIT_DISABLE_DMABUF_RENDERER=1`. On this Cinnamon X11 session the video path did not show a cat at all.
+- The **theme background feels sluggish to load** (shader/theme paint lag in WebKitGTK, separate from the missing cat).
+
+Idle/lock via cinnamon-screensaver and tray click vs right-click were not the point of this check. Do not treat Mint as “done.” Treat it as: **build/run works as-is; overlay video and background paint do not match Windows or the GNOME Wayland result.** File that under [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) / [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13), not a new distro port.
+
+This session used distro Node **18.19.1** (`apt install npm`) plus rustup. That was enough to compile. Prefer nvm Node 22 for a clean machine anyway (step 2).
+
+The Fat Cat overlay freeze found on GNOME Wayland is separate: the clips are 1080p VP9-**with-alpha** so the cat can sit on a transparent background. WebKitGTK’s DMA-BUF renderer cannot map that format (`_dma_fmt_to_dma_drm_fmts` / `GST_VIDEO_FORMAT_UNKNOWN`). The Linux binary sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` for all Linux sessions unless already set, plus `__NV_DISABLE_EXPLICIT_SYNC=1` when NVIDIA + Wayland. That workaround is a pragmatic default. Keeping alpha working on more than this GPU combo, and on X11 as well as Wayland, is [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) and [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12).
+
+WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay (src-swap shows one stretched opaque frame, then stalls). HTML `loop` and `play()` after `ended` are ignored. On Linux the overlay therefore plays **only** `neko2`, rewinds just before the last frame so it repeats, and still uses the CSS slide-in. The ~11s `neko1` intro is skipped until [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14). Intro→loop handover stays on Windows. Mint X11 did not get as far as that loop — the clip simply did not appear.
 
 ## Suggested next checks (TMP)
 
 1. [TMP-8](https://pikachurro.atlassian.net/browse/TMP-8) / [TMP-9](https://pikachurro.atlassian.net/browse/TMP-9) — install deps, `cargo check` on Linux
-2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray, settings, overlay on this Wayland hybrid (done); [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) X11; [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) other GPUs; [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14) Fat Cat intro→loop
+2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray, settings, overlay on this Wayland hybrid (done); [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) X11 (Mint 22.3 Cinnamon: overlay transparent, Fat Cat not playing, background sluggish — not closed); [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) other GPUs; [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14) Fat Cat intro→loop
 3. [TMP-11](https://pikachurro.atlassian.net/browse/TMP-11) / [TMP-5](https://pikachurro.atlassian.net/browse/TMP-5) / [TMP-10](https://pikachurro.atlassian.net/browse/TMP-10) — idle, lock/unlock, lock-after-break
 4. [TMP-6](https://pikachurro.atlassian.net/browse/TMP-6) / [TMP-7](https://pikachurro.atlassian.net/browse/TMP-7) — media and camera/mic (replace the `/proc` scan if it is noisy)
 5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — install/uninstall a `.deb` on Ubuntu 24
@@ -122,7 +193,7 @@ Linux stays a **tray host**, same as Windows: idle process, Settings and overlay
 
 Intended follow-on targets, in order:
 
-1. **Linux Mint (Cinnamon)** — X11 by default, native panel tray. Natural re-check of tray clicks, transparent fullscreen overlay under Cinnamon’s window manager, and `loginctl` idle/lock via cinnamon-screensaver. Mint can use the Ubuntu `.deb`.
+1. **Linux Mint (Cinnamon)** — X11 by default, native panel tray. Mint 22.3 already **compiled and launched** the Ubuntu 24 tree with no extra code. Remaining product work is overlay video (Fat Cat absent), sluggish theme background, tray click vs menu, and `loginctl` idle/lock via cinnamon-screensaver. Mint can use the Ubuntu `.deb`.
 2. **Fedora Cinnamon** — same desktop, different distro. Re-check packages, AppImage (no `.deb`), and idle/lock/overlay again.
 
 When that epic is opened, split tickets from what Ubuntu 24 already proved. Do not re-spec idle, lock, or overlay as unknown work.
