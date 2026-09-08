@@ -6,6 +6,7 @@
 
 <p align="center">A gentle break-reminder that lives in your system tray.</p>
 
+This repo is a Ubuntu 24 fork of https://github.com/Karlmit/Take-A-Moment
 ---
 
 ## Features
