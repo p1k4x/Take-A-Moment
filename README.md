@@ -86,9 +86,9 @@ Upstream is Windows-only. This repository is a fork that is adding Ubuntu 24
 support (Linux Mint 22.x uses the same packages). That work is **not finished**.
 
 Linux Mint 22.3 Cinnamon (X11) **builds and runs this tree as-is** — no Mint
-fork. The tray overlay comes up transparent; the Fat Cat clip does not play;
-the theme background is sluggish. That is overlay/WebKit work, not a missing
-distro port. See [docs/ubuntu-24-port.md](docs/ubuntu-24-port.md).
+fork. Overlay is transparent. Fat Cat can miss the first Preview after a cold
+`npm run dev`, then show and play on a later run. See
+[docs/ubuntu-24-port.md](docs/ubuntu-24-port.md).
 
 `npm` and `cargo` are **not** on a stock Mint/Ubuntu desktop. Do not run
 `sudo apt install npm` — that installs EOL Node 18. Install Node 22 via nvm,

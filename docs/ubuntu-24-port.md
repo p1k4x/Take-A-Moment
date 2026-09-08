@@ -32,7 +32,7 @@ Commit `2543b02` is a starting slice, not a finished Linux product.
 | Pause/resume media | `playerctl` (MPRIS) | Implemented, untested; no-ops if missing |
 | Camera/mic in use | Scan `/proc/*/fd` for `/dev/video*`, `/dev/snd/`, PipeWire/Pulse sockets | Rough; likely false positives |
 | Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | Configured, not produced in WSL |
-| Tray + overlay | Same Tauri code paths as Windows | Validated on Ubuntu 24 GNOME Wayland ([TMP-4](https://pikachurro.atlassian.net/browse/TMP-4)). Linux Mint 22.3 Cinnamon X11 **builds and launches** with that same code (see below). Overlay window is transparent; Fat Cat video does not play; theme background is sluggish. X11/GPU polish still [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) / [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13). |
+| Tray + overlay | Same Tauri code paths as Windows | Validated on Ubuntu 24 GNOME Wayland ([TMP-4](https://pikachurro.atlassian.net/browse/TMP-4)). Linux Mint 22.3 Cinnamon X11 **builds and launches** with that same code. First Preview after a cold `tauri dev` showed an empty transparent overlay; a later `npm run dev` showed Fat Cat playing with alpha. X11 still [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12); other GPUs [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13). |
 
 Windows behaviour is meant to stay unchanged (`#[cfg(windows)]` paths).
 
@@ -161,26 +161,25 @@ Expect bundles under `src-tauri/target/release/bundle/` (`deb` and `appimage`). 
 
 #### Linux Mint 22.3 Cinnamon X11 (first run, no extra code)
 
-Same Ubuntu 24 tree, no Mint-specific changes. After rustup + the apt list above, `cargo check` / `npm run dev` succeeded and the debug binary ran.
+Same Ubuntu 24 tree, no Mint-specific changes. After rustup + the apt list above, `cargo check` / `npm run dev` succeeded and the debug binary ran. `WEBKIT_DISABLE_DMABUF_RENDERER=1` is already a Linux-wide default, so X11 is supposed to get the same VP9-alpha path as GNOME Wayland.
 
 Observed on Preview break (not a full TMP-12 pass):
 
-- The fullscreen overlay **does** come up under muffin. The window looks **transparent** (no cat, glass/empty overlay).
-- The **Fat Cat clip does not play** (no walking cat). On GNOME Wayland, Linux still plays `neko2` with `WEBKIT_DISABLE_DMABUF_RENDERER=1`. On this Cinnamon X11 session the video path did not show a cat at all.
-- The **theme background feels sluggish to load** (shader/theme paint lag in WebKitGTK, separate from the missing cat).
+- First Preview after the **cold** `tauri dev` (full Rust compile): fullscreen overlay came up under muffin and looked **transparent**, but **Fat Cat did not show**. Theme background felt sluggish to load (shader/theme paint lag in WebKitGTK).
+- A later `npm run dev` (incremental, already-built binary): **Fat Cat shows and plays**, with a **transparent** background — same qualitative result as TMP-4 Wayland (`neko2` only; intro still skipped).
 
-Idle/lock via cinnamon-screensaver and tray click vs right-click were not the point of this check. Do not treat Mint as “done.” Treat it as: **build/run works as-is; overlay video and background paint do not match Windows or the GNOME Wayland result.** File that under [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) / [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13), not a new distro port.
+Do not treat “no cat” as the Mint baseline. Treat it as: **build/run works as-is; overlay video can miss the first Preview after a cold start, then work.** Idle/lock via cinnamon-screensaver and tray click vs right-click were not the point of this check. Still [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) / [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13), not a new distro port.
 
 This session used distro Node **18.19.1** (`apt install npm`) plus rustup. That was enough to compile. Prefer nvm Node 22 for a clean machine anyway (step 2).
 
 The Fat Cat overlay freeze found on GNOME Wayland is separate: the clips are 1080p VP9-**with-alpha** so the cat can sit on a transparent background. WebKitGTK’s DMA-BUF renderer cannot map that format (`_dma_fmt_to_dma_drm_fmts` / `GST_VIDEO_FORMAT_UNKNOWN`). The Linux binary sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` for all Linux sessions unless already set, plus `__NV_DISABLE_EXPLICIT_SYNC=1` when NVIDIA + Wayland. That workaround is a pragmatic default. Keeping alpha working on more than this GPU combo, and on X11 as well as Wayland, is [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) and [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12).
 
-WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay (src-swap shows one stretched opaque frame, then stalls). HTML `loop` and `play()` after `ended` are ignored. On Linux the overlay therefore plays **only** `neko2`, rewinds just before the last frame so it repeats, and still uses the CSS slide-in. The ~11s `neko1` intro is skipped until [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14). Intro→loop handover stays on Windows. Mint X11 did not get as far as that loop — the clip simply did not appear.
+WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay (src-swap shows one stretched opaque frame, then stalls). HTML `loop` and `play()` after `ended` are ignored. On Linux the overlay therefore plays **only** `neko2`, rewinds just before the last frame so it repeats, and still uses the CSS slide-in. The ~11s `neko1` intro is skipped until [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14). Intro→loop handover stays on Windows. Mint X11 reached that `neko2` loop on a later `npm run dev`; the first cold Preview did not.
 
 ## Suggested next checks (TMP)
 
 1. [TMP-8](https://pikachurro.atlassian.net/browse/TMP-8) / [TMP-9](https://pikachurro.atlassian.net/browse/TMP-9) — install deps, `cargo check` on Linux
-2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray, settings, overlay on this Wayland hybrid (done); [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) X11 (Mint 22.3 Cinnamon: overlay transparent, Fat Cat not playing, background sluggish — not closed); [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) other GPUs; [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14) Fat Cat intro→loop
+2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray, settings, overlay on this Wayland hybrid (done); [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) X11 (Mint 22.3 Cinnamon: cat+alpha on a later `npm run dev`; first cold Preview was empty/sluggish — not closed); [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) other GPUs; [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14) Fat Cat intro→loop
 3. [TMP-11](https://pikachurro.atlassian.net/browse/TMP-11) / [TMP-5](https://pikachurro.atlassian.net/browse/TMP-5) / [TMP-10](https://pikachurro.atlassian.net/browse/TMP-10) — idle, lock/unlock, lock-after-break
 4. [TMP-6](https://pikachurro.atlassian.net/browse/TMP-6) / [TMP-7](https://pikachurro.atlassian.net/browse/TMP-7) — media and camera/mic (replace the `/proc` scan if it is noisy)
 5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — install/uninstall a `.deb` on Ubuntu 24
@@ -193,7 +192,7 @@ Linux stays a **tray host**, same as Windows: idle process, Settings and overlay
 
 Intended follow-on targets, in order:
 
-1. **Linux Mint (Cinnamon)** — X11 by default, native panel tray. Mint 22.3 already **compiled and launched** the Ubuntu 24 tree with no extra code. Remaining product work is overlay video (Fat Cat absent), sluggish theme background, tray click vs menu, and `loginctl` idle/lock via cinnamon-screensaver. Mint can use the Ubuntu `.deb`.
+1. **Linux Mint (Cinnamon)** — X11 by default, native panel tray. Mint 22.3 already **compiled and launched** the Ubuntu 24 tree with no extra code. Fat Cat + transparent background worked on a later `npm run dev`; first cold Preview was empty. Remaining: first-preview reliability, tray click vs menu, `loginctl` idle/lock via cinnamon-screensaver. Mint can use the Ubuntu `.deb`.
 2. **Fedora Cinnamon** — same desktop, different distro. Re-check packages, AppImage (no `.deb`), and idle/lock/overlay again.
 
 When that epic is opened, split tickets from what Ubuntu 24 already proved. Do not re-spec idle, lock, or overlay as unknown work.
