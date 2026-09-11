@@ -31,7 +31,7 @@ Commit `2543b02` is a starting slice, not a finished Linux product.
 | Lock PC after long break | `loginctl lock-session` | Implemented, untested |
 | Pause/resume media | `playerctl` (MPRIS) | Implemented, untested; no-ops if missing |
 | Camera/mic in use | Scan `/proc/*/fd` for `/dev/video*`, `/dev/snd/`, PipeWire/Pulse sockets | Rough; likely false positives |
-| Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | Configured, not produced in WSL |
+| Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | Configured; a colleague AppImage built, but Fat Cat did not play ([TMP-15](https://pikachurro.atlassian.net/browse/TMP-15)). `.deb` install still [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) |
 | Tray + overlay | Same Tauri code paths as Windows | Validated on Ubuntu 24 GNOME Wayland ([TMP-4](https://pikachurro.atlassian.net/browse/TMP-4)). Linux Mint 22.3 Cinnamon X11 **builds and launches** with that same code. First Preview after a cold `tauri dev` showed an empty transparent overlay; a later `npm run dev` showed Fat Cat playing with alpha. X11 still [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12); other GPUs [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13). |
 
 Windows behaviour is meant to stay unchanged (`#[cfg(windows)]` paths).
@@ -144,7 +144,9 @@ Linux installer artifacts:
 npm run package
 ```
 
-Expect bundles under `src-tauri/target/release/bundle/` (`deb` and `appimage`). Mint can install the Ubuntu `.deb`.
+Expect bundles under `src-tauri/target/release/bundle/` (`deb` and `appimage`). There is no `release/*.exe` copy on Linux (`scripts/post-package.cjs` is Windows-only). Mint can install the Ubuntu `.deb`.
+
+A colleague AppImage could not play Fat Cat. Tauri AppImages omit GStreamer unless `bundle.linux.appimage.bundleMediaFramework` is `true`; this repo leaves the default (`false`). WebKitGTK `<video>` then has no VP9 plugins inside the image, even though `npm run dev` works against host `gstreamer1.0-plugins-good`. See [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15). The `.deb` may still work via system WebKit/GStreamer — that install path is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3).
 
 ### Errors this bootstrap is meant to prevent
 
@@ -183,6 +185,7 @@ WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay 
 3. [TMP-11](https://pikachurro.atlassian.net/browse/TMP-11) / [TMP-5](https://pikachurro.atlassian.net/browse/TMP-5) / [TMP-10](https://pikachurro.atlassian.net/browse/TMP-10) — idle, lock/unlock, lock-after-break
 4. [TMP-6](https://pikachurro.atlassian.net/browse/TMP-6) / [TMP-7](https://pikachurro.atlassian.net/browse/TMP-7) — media and camera/mic (replace the `/proc` scan if it is noisy)
 5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — install/uninstall a `.deb` on Ubuntu 24
+6. [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) — AppImage Fat Cat / bundle GStreamer (`bundleMediaFramework`)
 
 ## After Ubuntu 24 is stable (long-term)
 

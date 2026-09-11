@@ -22,6 +22,8 @@
 
 (Windows) Download **Take A Moment Setup x.x.x.exe** from the [latest release](https://github.com/Karlmit/Take-A-Moment/releases/latest) and run it.
 
+Those releases are still **Windows-only** (upstream). This fork does not yet ship a Linux `.deb` or AppImage.
+
 The installer is in **Swedish** by default. The app opens settings automatically on first launch so you can change the language right away.
 
 ### Silent install
@@ -69,13 +71,35 @@ npm install
 npm run dev
 ```
 
-Build installer:
+`npm run dev` is the path that has been exercised on this Ubuntu 24 fork
+(tray, settings, overlay). It uses the host WebKitGTK and host GStreamer.
+
+### Packaging (`npm run package`)
+
+Same npm script on both OSes; outputs differ. This fork has **not** fully
+validated a packaged Linux build — only `npm run dev` is known-good here.
+
+**Windows** (upstream NSIS; `scripts/post-package.cjs` copies the installer):
 
 ```
 npm run package
-# Windows: release/Take A Moment Setup x.x.x.exe
-# Linux: src-tauri/target/release/bundle/ (deb + AppImage)
+# Output: release/Take A Moment Setup x.x.x.exe
 ```
+
+**Linux** (`scripts/package.cjs` runs `tauri build --bundles deb appimage`):
+
+```
+npm run package
+# Output: src-tauri/target/release/bundle/deb/
+#         src-tauri/target/release/bundle/appimage/
+```
+
+A colleague AppImage build could not play the Fat Cat clip. Tauri does not
+bundle GStreamer into the AppImage unless
+`bundle.linux.appimage.bundleMediaFramework` is enabled, and this repo does
+not set that flag. Tracked as
+[TMP-15](https://pikachurro.atlassian.net/browse/TMP-15). Broader
+deb/AppImage install checks remain [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3).
 
 The app uses Tauri v2. The idle tray process is native Rust; Settings and the
 fullscreen break overlay are Vite/React webviews created on demand.
