@@ -24,6 +24,11 @@
     "resources": {
       "../assets/icons": "icons"
     },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",

@@ -94,12 +94,13 @@ npm run package
 #         src-tauri/target/release/bundle/appimage/
 ```
 
-A colleague AppImage build could not play the Fat Cat clip. Tauri does not
-bundle GStreamer into the AppImage unless
-`bundle.linux.appimage.bundleMediaFramework` is enabled, and this repo does
-not set that flag. Tracked as
-[TMP-15](https://pikachurro.atlassian.net/browse/TMP-15). Broader
-deb/AppImage install checks remain [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3).
+Linux AppImages set `bundle.linux.appimage.bundleMediaFramework` so WebKitGTK
+has GStreamer plugins inside the image (~95MB without, ~178MB with). Without
+that flag, `<video>` has no `decodebin`/`appsink`. Overlay UI still works on
+this machine; Fat Cat still does not paint. Tracked as
+[TMP-15](https://pikachurro.atlassian.net/browse/TMP-15). The `.deb` uses
+system WebKit/GStreamer. Broader install checks remain
+[TMP-3](https://pikachurro.atlassian.net/browse/TMP-3).
 
 The app uses Tauri v2. The idle tray process is native Rust; Settings and the
 fullscreen break overlay are Vite/React webviews created on demand.
