@@ -22,7 +22,8 @@
     "publisher": "Take A Moment",
     "icon": ["icons/icon.ico", "icons/icon.png"],
     "resources": {
-      "../assets/icons": "icons"
+      "../assets/icons": "icons",
+      "../src/public/videos": "videos"
     },
     "linux": {
       "appimage": {

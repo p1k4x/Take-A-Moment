@@ -32,10 +32,22 @@ fn main() {
 #[cfg(target_os = "linux")]
 fn apply_linux_webkit_workarounds() {
   set_env_if_unset("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-  if std::path::Path::new("/sys/module/nvidia").exists()
-    && std::env::var_os("WAYLAND_DISPLAY").is_some()
-  {
-    set_env_if_unset("__NV_DISABLE_EXPLICIT_SYNC", "1");
+  // NVIDIA On-Demand still loads libgstnvcodec (nvvp9dec rank == vp9dec).
+  // That decoder has no VP9 alpha, so WebKit FormatError's after a flash.
+  // Force software vp9alphadecodebin. 1080p VP9 is fine on the iGPU/CPU.
+  std::env::set_var(
+    "GST_PLUGIN_FEATURE_RANK",
+    "nvvp9dec:NONE,nvvp9sldec:NONE,nvvp8dec:NONE,nvvp8sldec:NONE,vaapivp9dec:NONE,vaapidecodebin:NONE",
+  );
+  if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+    // linuxdeploy-plugin-gtk exports GDK_BACKEND=x11 before our binary starts
+    // (tauri#8541). This app already runs on GNOME Wayland in `tauri dev`.
+    // AppImage on XWayland paints an opaque black overlay; Fat Cat is VP9-alpha
+    // and needs a real transparent window. Override the hook on Wayland.
+    std::env::set_var("GDK_BACKEND", "wayland");
+    if std::path::Path::new("/sys/module/nvidia").exists() {
+      set_env_if_unset("__NV_DISABLE_EXPLICIT_SYNC", "1");
+    }
   }
 }
 

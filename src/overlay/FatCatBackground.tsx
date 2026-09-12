@@ -1,7 +1,21 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
 function getVideoUrl(filename: string): string {
   return new URL(`../videos/${filename}`, location.href).href
+}
+
+function logFatCat(message: string) {
+  console.error(message)
+  void invoke('log_overlay', { message })
+}
+
+function logVideoError(ev: SyntheticEvent<HTMLVideoElement>) {
+  const video = ev.currentTarget
+  const err = video.error
+  logFatCat(
+    `[fatcat] video error src=${video.currentSrc} code=${err?.code} message=${err?.message} networkState=${video.networkState}`,
+  )
 }
 
 const fillStyle: CSSProperties = {
@@ -37,10 +51,38 @@ export function FatCatBackground() {
 // and then stalls. Play the loop clip only so the first pipeline keeps alpha.
 function LinuxLoop() {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [src, setSrc] = useState<string>()
+  const restRef = useRef<string[]>([])
+
+  // AppImage WebKitGTK rejects custom schemes (tauri://, asset://, blob:) with
+  // code=4. Serve the clip over loopback HTTP (souphttpsrc) and fall back to
+  // file:// (filesrc), then the bundled tauri:// URL last.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      logFatCat(`[fatcat] location=${location.href}`)
+      const bundled = getVideoUrl('neko2.webm')
+      try {
+        const urls = await invoke<string[]>('fatcat_video_urls', { filename: 'neko2.webm' })
+        const list = [...urls, bundled]
+        logFatCat(`[fatcat] candidates=${list.join(' | ')}`)
+        if (!cancelled) {
+          restRef.current = list.slice(1)
+          setSrc(list[0])
+        }
+      } catch (e) {
+        logFatCat(`[fatcat] fatcat_video_urls failed ${e}; using ${bundled}`)
+        if (!cancelled) setSrc(bundled)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const video = videoRef.current
-    if (!video) return
+    if (!video || !src) return
     let cooldownUntil = 0
 
     // HTML `loop` and play()-after-ended are ignored for VP9-alpha. Seek back
@@ -78,15 +120,28 @@ function LinuxLoop() {
       video.removeEventListener('ended', onEnded)
       video.removeEventListener('pause', onPause)
     }
-  }, [])
+  }, [src])
+
+  if (!src) return null
+
+  const handleError = (ev: SyntheticEvent<HTMLVideoElement>) => {
+    logVideoError(ev)
+    const next = restRef.current.shift()
+    if (next) {
+      logFatCat(`[fatcat] next src=${next}`)
+      setSrc(next)
+    }
+  }
 
   return (
     <video
       ref={videoRef}
-      src={getVideoUrl('neko2.webm')}
+      src={src}
       autoPlay
       muted
       playsInline
+      onError={handleError}
+      onPlaying={() => logFatCat(`[fatcat] playing src=${src}`)}
       style={fillStyle}
     />
   )

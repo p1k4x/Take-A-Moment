@@ -18,6 +18,9 @@ use tauri::{
 };
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
+#[cfg(target_os = "linux")]
+mod video_server;
+
 const STATUS_CHANGED: &str = "timer:status-changed";
 const SETTINGS_CHANGED: &str = "settings:changed";
 const BREAK_START: &str = "break:start";
@@ -119,6 +122,8 @@ struct Runtime {
   settings_path: PathBuf,
   inner: Mutex<Inner>,
   wake: Condvar,
+  #[cfg(target_os = "linux")]
+  fatcat_media: Option<video_server::FatCatMedia>,
 }
 
 impl Runtime {
@@ -126,6 +131,20 @@ impl Runtime {
     let settings_path = legacy_settings_path(&app)?;
     let (settings, first_run) = load_settings(&app, &settings_path)?;
     let initially_paused = settings.paused;
+    #[cfg(target_os = "linux")]
+    let fatcat_media = match video_server::find_videos_dir(&app) {
+      Some(dir) => match video_server::start(dir) {
+        Ok(media) => Some(media),
+        Err(e) => {
+          eprintln!("[fatcat] http server failed: {e}");
+          None
+        }
+      },
+      None => {
+        eprintln!("[fatcat] videos dir not found");
+        None
+      }
+    };
     let runtime = Arc::new(Self {
       app,
       settings_path,
@@ -140,6 +159,8 @@ impl Runtime {
         paused_sessions: Vec::new(),
       }),
       wake: Condvar::new(),
+      #[cfg(target_os = "linux")]
+      fatcat_media,
     });
     runtime.reschedule_all();
     Ok(runtime)
@@ -737,6 +758,52 @@ fn overlay_ready(runtime: State<Arc<Runtime>>, label: String) {
   runtime.overlay_ready(label)
 }
 
+/// Overlay webview console does not reach the AppImage terminal. Print there.
+#[tauri::command]
+fn log_overlay(message: String) {
+  eprintln!("{message}");
+}
+
+/// HTTP (souphttpsrc) then file:// (filesrc). Custom schemes fail in AppImage WebKit.
+#[tauri::command]
+fn fatcat_video_urls(
+  runtime: State<Arc<Runtime>>,
+  filename: String,
+) -> Result<Vec<String>, String> {
+  #[cfg(not(target_os = "linux"))]
+  {
+    let _ = runtime;
+    let _ = filename;
+    Err("linux only".into())
+  }
+  #[cfg(target_os = "linux")]
+  {
+    if !matches!(filename.as_str(), "neko1.webm" | "neko2.webm") {
+      return Err(format!("unknown clip {filename}"));
+    }
+    let mut urls = Vec::new();
+    if let Some(media) = &runtime.fatcat_media {
+      let path = media.videos_dir.join(&filename);
+      if path.is_file() {
+        urls.push(format!("{}/{filename}", media.origin));
+        urls.push(video_server::file_url(&path));
+      }
+    }
+    if urls.is_empty() {
+      if let Some(dir) = video_server::find_videos_dir(&runtime.app) {
+        let path = dir.join(&filename);
+        if path.is_file() {
+          urls.push(video_server::file_url(&path));
+        }
+      }
+    }
+    if urls.is_empty() {
+      return Err(format!("{filename} not found"));
+    }
+    Ok(urls)
+  }
+}
+
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -772,7 +839,9 @@ pub fn run() {
       quit,
       get_version,
       is_first_run,
-      overlay_ready
+      overlay_ready,
+      log_overlay,
+      fatcat_video_urls
     ])
     .build(tauri::generate_context!())
     .expect("error while building Take A Moment")
