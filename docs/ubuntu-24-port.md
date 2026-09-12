@@ -31,7 +31,7 @@ Commit `2543b02` is a starting slice, not a finished Linux product.
 | Lock PC after long break | `loginctl lock-session` | Implemented, untested |
 | Pause/resume media | `playerctl` (MPRIS) | Implemented, untested; no-ops if missing |
 | Camera/mic in use | Scan `/proc/*/fd` for `/dev/video*`, `/dev/snd/`, PipeWire/Pulse sockets | Rough; likely false positives |
-| Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | [0.11.6 Linux preview](https://github.com/p1k4x/Take-A-Moment/releases/tag/v0.11.6-linux) has the `.deb` and AppImage. AppImage Fat Cat playback is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done). `.deb` install/uninstall on Ubuntu 24 is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done). |
+| Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | [0.11.6 Linux preview](https://github.com/p1k4x/Take-A-Moment/releases/tag/v0.11.6-linux) has the `.deb` and AppImage. AppImage Fat Cat playback is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done). Overlay alpha in `.deb` and AppImage is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16) (done). `.deb` install/uninstall on Ubuntu 24 is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done). |
 | Tray + overlay | Same Tauri code paths as Windows | Validated on Ubuntu 24 GNOME Wayland ([TMP-4](https://pikachurro.atlassian.net/browse/TMP-4)). Linux Mint 22.3 Cinnamon X11 **builds and launches** with that same code. First Preview after a cold `tauri dev` showed an empty transparent overlay; a later `npm run dev` showed Fat Cat playing with alpha. X11 still [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12); other GPUs [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13). |
 
 Windows behaviour is meant to stay unchanged (`#[cfg(windows)]` paths).
@@ -150,9 +150,9 @@ npm run package
 
 Copies land under `release/` (`Take-A-Moment_*_amd64.deb` and `.AppImage`). Mint can install the Ubuntu `.deb`. `apt remove take-a-moment` uninstalls it; user settings are left in `~/.local/share/app.take-a-moment/`.
 
-AppImage Fat Cat is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done): `bundleMediaFramework` plus loopback HTTP. Opaque/black leftover is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16). The `.deb` uses system WebKit/GStreamer (`gstreamer1.0-plugins-good` and `gstreamer1.0-plugins-bad` as package Depends). `apt install` / `apt remove take-a-moment` on Ubuntu 24 is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done).
+AppImage Fat Cat is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done): `bundleMediaFramework` plus loopback HTTP. Overlay alpha matching `npm run dev` in the `.deb` and AppImage is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16) (done). The `.deb` uses system WebKit/GStreamer (`gstreamer1.0-plugins-good` and `gstreamer1.0-plugins-bad` as package Depends). `apt install` / `apt remove take-a-moment` on Ubuntu 24 is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done).
 
-`scripts/package.cjs` sets `NO_STRIP=true` (Ubuntu 24 `.relr.dyn` strip crashes) and, when a PATH directory contains unreadable files such as SentinelOne `sentinelctl`, substitutes a symlink farm so linuxdeploy can finish.
+`scripts/package.cjs` sets `NO_STRIP=true` (Ubuntu 24 `.relr.dyn` strip crashes). linuxdeploy `stat()`s every PATH entry and aborts on unreadable SentinelOne `/usr/bin/sentinelctl`; the script runs an extracted linuxdeploy with `/usr/bin` hidden (and strips Tauri’s `--appimage-extract-and-run`, which the extracted ELF rejects) so the AppImage still builds on that host.
 
 ### Errors this bootstrap is meant to prevent
 
@@ -182,6 +182,8 @@ This session used distro Node **18.19.1** (`apt install npm`) plus rustup. That 
 
 The Fat Cat overlay freeze found on GNOME Wayland is separate: the clips are 1080p VP9-**with-alpha** so the cat can sit on a transparent background. WebKitGTK’s DMA-BUF renderer cannot map that format (`_dma_fmt_to_dma_drm_fmts` / `GST_VIDEO_FORMAT_UNKNOWN`). The Linux binary sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` for all Linux sessions unless already set, plus `__NV_DISABLE_EXPLICIT_SYNC=1` when NVIDIA + Wayland. That workaround is a pragmatic default. Keeping alpha working on more than this GPU combo, and on X11 as well as Wayland, is [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) and [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12).
 
+A later GNOME Wayland black fill (every overlay, not Fat Cat-only) was **not** the VP9 decoder. Mutter forces `xdg_toplevel` fullscreen surfaces opaque ([mutter#2520](https://gitlab.gnome.org/GNOME/mutter/-/issues/2520)). Linux therefore skips `set_fullscreen(true)` and covers the monitor with the already-sized always-on-top transparent window ([TMP-16](https://pikachurro.atlassian.net/browse/TMP-16), done — verified in `npm run dev`, `.deb`, and AppImage). WebKitGTK also paints CSS-mask / clip-path holes black, so Linux enter/exit slides or fades the overlay instead. The GNOME top bar and Ubuntu Dock still sit above that window — covering them like Windows fullscreen is [TMP-17](https://pikachurro.atlassian.net/browse/TMP-17), without bringing Linux fullscreen back.
+
 WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay (src-swap shows one stretched opaque frame, then stalls). HTML `loop` and `play()` after `ended` are ignored. On Linux the overlay therefore plays **only** `neko2`, rewinds just before the last frame so it repeats, and still uses the CSS slide-in. The ~11s `neko1` intro is skipped until [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14). Intro→loop handover stays on Windows. Mint X11 reached that `neko2` loop on a later `npm run dev`; the first cold Preview did not.
 
 ## Suggested next checks (TMP)
@@ -191,7 +193,7 @@ WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay 
 3. [TMP-11](https://pikachurro.atlassian.net/browse/TMP-11) / [TMP-5](https://pikachurro.atlassian.net/browse/TMP-5) / [TMP-10](https://pikachurro.atlassian.net/browse/TMP-10) — idle, lock/unlock, lock-after-break
 4. [TMP-6](https://pikachurro.atlassian.net/browse/TMP-6) / [TMP-7](https://pikachurro.atlassian.net/browse/TMP-7) — media and camera/mic (replace the `/proc` scan if it is noisy)
 5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — `.deb` install/uninstall on Ubuntu 24 (done); preview artifacts on [v0.11.6-linux](https://github.com/p1k4x/Take-A-Moment/releases/tag/v0.11.6-linux)
-6. [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) — AppImage Fat Cat playback (done); leftover alpha is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16)
+6. [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) — AppImage Fat Cat playback (done); [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16) overlay alpha in `.deb` / AppImage (done). Next overlay gap is [TMP-17](https://pikachurro.atlassian.net/browse/TMP-17) (GNOME top bar / Ubuntu Dock).
 
 ## After Ubuntu 24 is stable (long-term)
 

@@ -127,10 +127,14 @@ npm run package
 ```
 
 The AppImage sets `bundle.linux.appimage.bundleMediaFramework` so WebKitGTK
-has GStreamer plugins inside the image. Fat Cat playback in the AppImage is
-[TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done; leftover
-opaque/black alpha is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16)).
-The `.deb` depends on system WebKitGTK plus `gstreamer1.0-plugins-good` and
+has GStreamer plugins inside the image. Fat Cat playback is
+[TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done). Overlay
+alpha on GNOME Wayland — desktop through Fat Cat and enter/exit, in
+`npm run dev`, `.deb`, and AppImage — is
+[TMP-16](https://pikachurro.atlassian.net/browse/TMP-16) (done). The overlay
+does not cover the GNOME top bar or Ubuntu Dock
+([TMP-17](https://pikachurro.atlassian.net/browse/TMP-17)). The `.deb`
+depends on system WebKitGTK plus `gstreamer1.0-plugins-good` and
 `gstreamer1.0-plugins-bad`. Install and uninstall on Ubuntu 24 is
 [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done).
 
@@ -146,7 +150,9 @@ exists so you can install without building.
 
 Linux Mint 22.3 Cinnamon (X11) **builds and runs this tree as-is** — no Mint
 fork. Overlay is transparent. Fat Cat can miss the first Preview after a cold
-`npm run dev`, then show and play on a later run. See
+`npm run dev`, then show and play on a later run. On Ubuntu 24 GNOME Wayland
+the overlay is also transparent (TMP-16); it is sized to the monitor rather
+than xdg fullscreen, so the top bar and dock stay visible (TMP-17). See
 [docs/ubuntu-24-port.md](docs/ubuntu-24-port.md).
 
 `npm` and `cargo` are **not** on a stock Mint/Ubuntu desktop. Do not run
