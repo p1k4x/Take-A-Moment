@@ -28,21 +28,14 @@ The installer is in **Swedish** by default. The app opens settings automatically
 
 ### Linux (this fork)
 
-Build packages on Ubuntu 24 / Mint 22:
-
-```
-npm run package
-```
-
-Artifacts land in `release/`:
-
-- `Take-A-Moment_x.x.x_amd64.deb`
-- `Take-A-Moment_x.x.x_amd64.AppImage`
+Download the **pre-release** from
+[0.11.6 Linux preview](https://github.com/p1k4x/Take-A-Moment/releases/tag/v0.11.6-linux)
+(`.deb` or AppImage). This is an Ubuntu 24 preview, not a finished port.
 
 **Debian package** (uses system WebKitGTK and GStreamer):
 
 ```
-sudo apt install ./release/Take-A-Moment_0.11.6_amd64.deb
+sudo apt install ./Take-A-Moment_0.11.6_amd64.deb
 ```
 
 Launch from the app menu or `take-a-moment`. Uninstall:
@@ -56,11 +49,13 @@ That removes the app. Settings stay in `~/.local/share/app.take-a-moment/`. Auto
 **AppImage** (GStreamer plugins are bundled):
 
 ```
-chmod +x ./release/Take-A-Moment_0.11.6_amd64.AppImage
-./release/Take-A-Moment_0.11.6_amd64.AppImage
+chmod +x ./Take-A-Moment_0.11.6_amd64.AppImage
+./Take-A-Moment_0.11.6_amd64.AppImage
 ```
 
 Uninstall: quit from the tray, then delete the `.AppImage`. Remove the same settings/autostart paths if you do not want leftovers.
+
+To rebuild locally: `npm run package` (see Packaging below).
 
 ### Silent install
 
@@ -122,7 +117,8 @@ npm run package
 # Output: release/Take A Moment Setup x.x.x.exe
 ```
 
-**Linux** (`scripts/package.cjs` builds `.deb` then AppImage):
+**Linux** (`scripts/package.cjs` builds `.deb` then AppImage). Testers can skip
+this and use the [pre-release](https://github.com/p1k4x/Take-A-Moment/releases/tag/v0.11.6-linux).
 
 ```
 npm run package
@@ -145,6 +141,8 @@ fullscreen break overlay are Vite/React webviews created on demand.
 
 Upstream is Windows-only. This repository is a fork that is adding Ubuntu 24
 support (Linux Mint 22.x uses the same packages). That work is **not finished**.
+A [Linux pre-release](https://github.com/p1k4x/Take-A-Moment/releases/tag/v0.11.6-linux)
+exists so you can install without building.
 
 Linux Mint 22.3 Cinnamon (X11) **builds and runs this tree as-is** — no Mint
 fork. Overlay is transparent. Fat Cat can miss the first Preview after a cold
