@@ -20,11 +20,47 @@
 
 ## Installation
 
-(Windows) Download **Take A Moment Setup x.x.x.exe** from the [latest release](https://github.com/Karlmit/Take-A-Moment/releases/latest) and run it.
+### Windows (upstream)
 
-Those releases are still **Windows-only** (upstream). This fork does not yet ship a Linux `.deb` or AppImage.
+Download **Take A Moment Setup x.x.x.exe** from the [latest upstream release](https://github.com/Karlmit/Take-A-Moment/releases/latest) and run it.
 
 The installer is in **Swedish** by default. The app opens settings automatically on first launch so you can change the language right away.
+
+### Linux (this fork)
+
+Build packages on Ubuntu 24 / Mint 22:
+
+```
+npm run package
+```
+
+Artifacts land in `release/`:
+
+- `Take-A-Moment_x.x.x_amd64.deb`
+- `Take-A-Moment_x.x.x_amd64.AppImage`
+
+**Debian package** (uses system WebKitGTK and GStreamer):
+
+```
+sudo apt install ./release/Take-A-Moment_0.11.6_amd64.deb
+```
+
+Launch from the app menu or `take-a-moment`. Uninstall:
+
+```
+sudo apt remove take-a-moment
+```
+
+That removes the app. Settings stay in `~/.local/share/app.take-a-moment/`. Autostart, if you enabled it, is `~/.config/autostart/`. Delete those if you want a clean slate.
+
+**AppImage** (GStreamer plugins are bundled):
+
+```
+chmod +x ./release/Take-A-Moment_0.11.6_amd64.AppImage
+./release/Take-A-Moment_0.11.6_amd64.AppImage
+```
+
+Uninstall: quit from the tray, then delete the `.AppImage`. Remove the same settings/autostart paths if you do not want leftovers.
 
 ### Silent install
 
@@ -76,31 +112,31 @@ npm run dev
 
 ### Packaging (`npm run package`)
 
-Same npm script on both OSes; outputs differ. This fork has **not** fully
-validated a packaged Linux build — only `npm run dev` is known-good here.
+Same npm script on both OSes; `scripts/post-package.cjs` copies artifacts into
+`release/` (that directory is gitignored).
 
-**Windows** (upstream NSIS; `scripts/post-package.cjs` copies the installer):
+**Windows** (upstream NSIS):
 
 ```
 npm run package
 # Output: release/Take A Moment Setup x.x.x.exe
 ```
 
-**Linux** (`scripts/package.cjs` runs `tauri build --bundles deb appimage`):
+**Linux** (`scripts/package.cjs` builds `.deb` then AppImage):
 
 ```
 npm run package
-# Output: src-tauri/target/release/bundle/deb/
-#         src-tauri/target/release/bundle/appimage/
+# Output: release/Take-A-Moment_x.x.x_amd64.deb
+#         release/Take-A-Moment_x.x.x_amd64.AppImage
 ```
 
-Linux AppImages set `bundle.linux.appimage.bundleMediaFramework` so WebKitGTK
-has GStreamer plugins inside the image (~95MB without, ~178MB with). Without
-that flag, `<video>` has no `decodebin`/`appsink`. Overlay UI still works on
-this machine; Fat Cat still does not paint. Tracked as
-[TMP-15](https://pikachurro.atlassian.net/browse/TMP-15). The `.deb` uses
-system WebKit/GStreamer. Broader install checks remain
-[TMP-3](https://pikachurro.atlassian.net/browse/TMP-3).
+The AppImage sets `bundle.linux.appimage.bundleMediaFramework` so WebKitGTK
+has GStreamer plugins inside the image. Fat Cat playback in the AppImage is
+[TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done; leftover
+opaque/black alpha is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16)).
+The `.deb` depends on system WebKitGTK plus `gstreamer1.0-plugins-good` and
+`gstreamer1.0-plugins-bad`. Install and uninstall on Ubuntu 24 is
+[TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done).
 
 The app uses Tauri v2. The idle tray process is native Rust; Settings and the
 fullscreen break overlay are Vite/React webviews created on demand.

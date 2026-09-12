@@ -31,7 +31,7 @@ Commit `2543b02` is a starting slice, not a finished Linux product.
 | Lock PC after long break | `loginctl lock-session` | Implemented, untested |
 | Pause/resume media | `playerctl` (MPRIS) | Implemented, untested; no-ops if missing |
 | Camera/mic in use | Scan `/proc/*/fd` for `/dev/video*`, `/dev/snd/`, PipeWire/Pulse sockets | Rough; likely false positives |
-| Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | Configured; a colleague AppImage built, but Fat Cat did not play ([TMP-15](https://pikachurro.atlassian.net/browse/TMP-15)). `.deb` install still [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) |
+| Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | Scripts copy both Linux artifacts to `release/`. AppImage Fat Cat playback is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done). `.deb` install/uninstall on Ubuntu 24 is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done). |
 | Tray + overlay | Same Tauri code paths as Windows | Validated on Ubuntu 24 GNOME Wayland ([TMP-4](https://pikachurro.atlassian.net/browse/TMP-4)). Linux Mint 22.3 Cinnamon X11 **builds and launches** with that same code. First Preview after a cold `tauri dev` showed an empty transparent overlay; a later `npm run dev` showed Fat Cat playing with alpha. X11 still [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12); other GPUs [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13). |
 
 Windows behaviour is meant to stay unchanged (`#[cfg(windows)]` paths).
@@ -144,11 +144,11 @@ Linux installer artifacts:
 npm run package
 ```
 
-Expect bundles under `src-tauri/target/release/bundle/` (`deb` and `appimage`). There is no `release/*.exe` copy on Linux (`scripts/post-package.cjs` is Windows-only). Mint can install the Ubuntu `.deb`.
+Expect copies under `release/` (`Take-A-Moment_*_amd64.deb` and `.AppImage`). Mint can install the Ubuntu `.deb`. `apt remove take-a-moment` uninstalls it; user settings are left in `~/.local/share/app.take-a-moment/`.
 
-AppImage Fat Cat is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15): reproduced on this GNOME Wayland ZBook. Without `bundleMediaFramework`, the image ships GStreamer *libs* but no plugins (`decodebin` / `appsink` / `appsrc` missing). `bundle.linux.appimage.bundleMediaFramework` is now `true` (~178MB vs ~95MB). Bundled Preview: overlay UI and buttons work; **Fat Cat still does not paint**. The `.deb` uses system WebKit/GStreamer — that install path is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3).
+AppImage Fat Cat is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done): `bundleMediaFramework` plus loopback HTTP. Opaque/black leftover is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16). The `.deb` uses system WebKit/GStreamer (`gstreamer1.0-plugins-good` and `gstreamer1.0-plugins-bad` as package Depends). `apt install` / `apt remove take-a-moment` on Ubuntu 24 is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done).
 
-`npm run package` AppImage on this machine also hit linuxdeploy `boost::filesystem::status: Permission denied: "/usr/bin/sentinelctl"` (SentinelOne; `/bin` is usr-merged). Workaround: keep `/usr/bin` off `PATH` while bundling. `NO_STRIP=true` avoids Ubuntu 24 `.relr.dyn` strip crashes. Neither is in the repo; they are local packaging hazards.
+`scripts/package.cjs` sets `NO_STRIP=true` (Ubuntu 24 `.relr.dyn` strip crashes) and, when a PATH directory contains unreadable files such as SentinelOne `sentinelctl`, substitutes a symlink farm so linuxdeploy can finish.
 
 ### Errors this bootstrap is meant to prevent
 
@@ -186,8 +186,8 @@ WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay 
 2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray, settings, overlay on this Wayland hybrid (done); [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) X11 (Mint 22.3 Cinnamon: cat+alpha on a later `npm run dev`; first cold Preview was empty/sluggish — not closed); [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) other GPUs; [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14) Fat Cat intro→loop
 3. [TMP-11](https://pikachurro.atlassian.net/browse/TMP-11) / [TMP-5](https://pikachurro.atlassian.net/browse/TMP-5) / [TMP-10](https://pikachurro.atlassian.net/browse/TMP-10) — idle, lock/unlock, lock-after-break
 4. [TMP-6](https://pikachurro.atlassian.net/browse/TMP-6) / [TMP-7](https://pikachurro.atlassian.net/browse/TMP-7) — media and camera/mic (replace the `/proc` scan if it is noisy)
-5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — install/uninstall a `.deb` on Ubuntu 24 (AppImage GStreamer is TMP-15)
-6. [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) — AppImage Fat Cat: plugins now bundled; overlay UI works; clip still does not play on this ZBook
+5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — `.deb` install/uninstall on Ubuntu 24 (done)
+6. [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) — AppImage Fat Cat playback (done); leftover alpha is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16)
 
 ## After Ubuntu 24 is stable (long-term)
 

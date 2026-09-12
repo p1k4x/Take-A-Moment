@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+Comment={{comment}}
+Exec={{exec}}
+Icon={{icon}}
+Terminal=false
+StartupNotify=false
+StartupWMClass=take-a-moment
+Categories={{categories}}
+Keywords=break;reminder;timer;rest;

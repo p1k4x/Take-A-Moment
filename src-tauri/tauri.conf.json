@@ -20,6 +20,10 @@
     "active": true,
     "targets": ["deb", "appimage", "nsis"],
     "publisher": "Take A Moment",
+    "category": "Utility",
+    "homepage": "https://github.com/p1k4x/Take-A-Moment",
+    "shortDescription": "A gentle break-reminder that lives in the system tray",
+    "longDescription": "Fullscreen break overlays with configurable reminders. The Debian package uses system WebKitGTK and GStreamer.",
     "icon": ["icons/icon.ico", "icons/icon.png"],
     "resources": {
       "../assets/icons": "icons",
@@ -28,6 +32,18 @@
     "linux": {
       "appimage": {
         "bundleMediaFramework": true
+      },
+      "deb": {
+        "section": "utils",
+        "depends": [
+          "gstreamer1.0-plugins-good",
+          "gstreamer1.0-plugins-bad"
+        ],
+        "recommends": ["playerctl"],
+        "desktopTemplate": "linux/take-a-moment.desktop",
+        "preRemoveScript": "linux/prerm",
+        "postInstallScript": "linux/postinst",
+        "postRemoveScript": "linux/postrm"
       }
     },
     "windows": {

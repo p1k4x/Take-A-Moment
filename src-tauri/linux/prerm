@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+# Quit the tray host so dpkg can replace or remove /usr/bin/take-a-moment.
+if command -v pkill >/dev/null 2>&1; then
+  pkill -x take-a-moment 2>/dev/null || true
+fi
+exit 0

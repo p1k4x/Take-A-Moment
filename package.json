@@ -1,7 +1,7 @@
 {
   "name": "take-a-moment",
   "version": "0.11.6",
-  "description": "A gentle Windows break-reminder app",
+  "description": "A gentle break-reminder that lives in the system tray",
   "scripts": {
     "predev": "node scripts/gen-assets.cjs",
     "dev": "tauri dev",
