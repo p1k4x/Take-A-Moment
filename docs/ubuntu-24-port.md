@@ -31,7 +31,7 @@ Commit `2543b02` is a starting slice, not a finished Linux product.
 | Lock PC after long break | `loginctl lock-session` | Implemented, untested |
 | Pause/resume media | `playerctl` (MPRIS) | Implemented, untested; no-ops if missing |
 | Camera/mic in use | Scan `/proc/*/fd` for `/dev/video*`, `/dev/snd/`, PipeWire/Pulse sockets | Rough; likely false positives |
-| Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | Scripts copy both Linux artifacts to `release/`. AppImage Fat Cat playback is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done). `.deb` install/uninstall on Ubuntu 24 is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done). |
+| Packaging | `npm run package` builds NSIS on Windows, deb+AppImage on Linux | [0.11.6 Linux preview](https://github.com/p1k4x/Take-A-Moment/releases/tag/v0.11.6-linux) has the `.deb` and AppImage. AppImage Fat Cat playback is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done). `.deb` install/uninstall on Ubuntu 24 is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done). |
 | Tray + overlay | Same Tauri code paths as Windows | Validated on Ubuntu 24 GNOME Wayland ([TMP-4](https://pikachurro.atlassian.net/browse/TMP-4)). Linux Mint 22.3 Cinnamon X11 **builds and launches** with that same code. First Preview after a cold `tauri dev` showed an empty transparent overlay; a later `npm run dev` showed Fat Cat playing with alpha. X11 still [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12); other GPUs [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13). |
 
 Windows behaviour is meant to stay unchanged (`#[cfg(windows)]` paths).
@@ -138,13 +138,17 @@ npm run dev
 
 `npm ci` needs a committed `package-lock.json` and matches CI. `npm install` also works on a dirty tree.
 
-Linux installer artifacts:
+Linux installer artifacts: testers can skip the toolchain and download the
+[0.11.6 Linux preview](https://github.com/p1k4x/Take-A-Moment/releases/tag/v0.11.6-linux)
+(`.deb` or AppImage). That is a preview, not a finished port.
+
+To rebuild locally:
 
 ```bash
 npm run package
 ```
 
-Expect copies under `release/` (`Take-A-Moment_*_amd64.deb` and `.AppImage`). Mint can install the Ubuntu `.deb`. `apt remove take-a-moment` uninstalls it; user settings are left in `~/.local/share/app.take-a-moment/`.
+Copies land under `release/` (`Take-A-Moment_*_amd64.deb` and `.AppImage`). Mint can install the Ubuntu `.deb`. `apt remove take-a-moment` uninstalls it; user settings are left in `~/.local/share/app.take-a-moment/`.
 
 AppImage Fat Cat is [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) (done): `bundleMediaFramework` plus loopback HTTP. Opaque/black leftover is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16). The `.deb` uses system WebKit/GStreamer (`gstreamer1.0-plugins-good` and `gstreamer1.0-plugins-bad` as package Depends). `apt install` / `apt remove take-a-moment` on Ubuntu 24 is [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) (done).
 
@@ -186,7 +190,7 @@ WebKitGTK also cannot start a **second** VP9-alpha pipeline in the same overlay 
 2. [TMP-4](https://pikachurro.atlassian.net/browse/TMP-4) — tray, settings, overlay on this Wayland hybrid (done); [TMP-12](https://pikachurro.atlassian.net/browse/TMP-12) X11 (Mint 22.3 Cinnamon: cat+alpha on a later `npm run dev`; first cold Preview was empty/sluggish — not closed); [TMP-13](https://pikachurro.atlassian.net/browse/TMP-13) other GPUs; [TMP-14](https://pikachurro.atlassian.net/browse/TMP-14) Fat Cat intro→loop
 3. [TMP-11](https://pikachurro.atlassian.net/browse/TMP-11) / [TMP-5](https://pikachurro.atlassian.net/browse/TMP-5) / [TMP-10](https://pikachurro.atlassian.net/browse/TMP-10) — idle, lock/unlock, lock-after-break
 4. [TMP-6](https://pikachurro.atlassian.net/browse/TMP-6) / [TMP-7](https://pikachurro.atlassian.net/browse/TMP-7) — media and camera/mic (replace the `/proc` scan if it is noisy)
-5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — `.deb` install/uninstall on Ubuntu 24 (done)
+5. [TMP-3](https://pikachurro.atlassian.net/browse/TMP-3) — `.deb` install/uninstall on Ubuntu 24 (done); preview artifacts on [v0.11.6-linux](https://github.com/p1k4x/Take-A-Moment/releases/tag/v0.11.6-linux)
 6. [TMP-15](https://pikachurro.atlassian.net/browse/TMP-15) — AppImage Fat Cat playback (done); leftover alpha is [TMP-16](https://pikachurro.atlassian.net/browse/TMP-16)
 
 ## After Ubuntu 24 is stable (long-term)
