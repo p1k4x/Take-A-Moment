@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 0 80px 0 oklch(0.20 0.025 140 / 0.06);
+  transform-origin: 50% 0%;
   --hole-pct: -20;
   mask-image: radial-gradient(
     circle at 50% 50%,
@@ -49,6 +50,13 @@
 .overlayFatCat:not(.overlayExiting) {
   mask-image: none;
   -webkit-mask-image: none;
+}
+
+/* TMP-16: WebKitGTK paints mask holes black. Must live in this module —
+   overlay.css cannot target .overlay because CSS modules hash the name. */
+.noMask {
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
 }
 
 /* Subtle dark veil over animated bg for text legibility */

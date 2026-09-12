@@ -25,6 +25,7 @@ function formatTime(ms: number): string {
 
 const OVERLAY_LABEL = new URLSearchParams(window.location.search).get('label') ?? 'overlay-0'
 const IS_AUDIO_OWNER = OVERLAY_LABEL === 'overlay-0'
+const IS_LINUX = new URLSearchParams(window.location.search).get('linux') === '1'
 
 export function App() {
   const [breakData, setBreakData] = useState<ActiveBreak | null>(null)
@@ -166,16 +167,44 @@ export function App() {
     } as Record<string, string | number | object>,
   } as Variants
 
+  // WebKitGTK fills clip-path / CSS-mask holes with black instead of the
+  // desktop (TMP-16). Slide the opaque overlay itself so vacated pixels are
+  // just an empty transparent window.
+  const linuxCurtainVariants = {
+    hidden: { y: '-100%' },
+    visible: {
+      y: '0%',
+      transition: { duration: 1.5, ease: [0.4, 0, 0.9, 0.15] },
+    },
+    exit: {
+      y: '-100%',
+      transition: { duration: 0.8, ease: [0.4, 0, 1, 0.2] },
+    },
+  } as Variants
+
+  const linuxFadeVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] } },
+    exit: { opacity: 0, transition: { duration: 0.5, ease: [0.4, 0, 1, 0.2] } },
+  } as Variants
+
   // Fat Cat mode skips the radial curtain on the way in — the video itself
   // slides in instead (see fatCatSlideVariants below) — but the break still
   // ends with the same radial wipe as every other mode, so exit is shared.
-  const overlayVariants = {
-    hidden: isFatCat ? { opacity: 0 } : curtainOverlayVariants.hidden,
-    visible: isFatCat
-      ? { opacity: 1, transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] } }
-      : curtainOverlayVariants.visible,
-    exit: curtainOverlayVariants.exit,
-  } as Variants
+  // Linux cannot use that wipe (mask → black), so Fat Cat fades out instead.
+  const overlayVariants = (
+    IS_LINUX
+      ? isFatCat
+        ? linuxFadeVariants
+        : linuxCurtainVariants
+      : {
+          hidden: isFatCat ? { opacity: 0 } : curtainOverlayVariants.hidden,
+          visible: isFatCat
+            ? { opacity: 1, transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] } }
+            : curtainOverlayVariants.visible,
+          exit: curtainOverlayVariants.exit,
+        }
+  ) as Variants
 
   // Matches the slide-in from the original cat-gatekeeper's content.css
   // (`animation: slide-in 3s forwards`, `translateX(100vw) -> 0`, default
@@ -201,7 +230,7 @@ export function App() {
     <AnimatePresence>
       {armed && breakData && (
         <motion.div
-          className={`${styles.overlay} ${isDarkBg ? styles.overlayDark : ''} ${isFatCat ? styles.overlayFatCat : ''} ${exiting ? styles.overlayExiting : ''}`}
+          className={`${styles.overlay} ${isDarkBg ? styles.overlayDark : ''} ${isFatCat ? styles.overlayFatCat : ''} ${exiting ? styles.overlayExiting : ''} ${IS_LINUX ? styles.noMask : ''}`}
           variants={overlayVariants}
           initial="hidden"
           animate={visible ? 'visible' : 'hidden'}

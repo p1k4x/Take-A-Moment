@@ -37,7 +37,7 @@ fn apply_linux_webkit_workarounds() {
   // Force software vp9alphadecodebin. 1080p VP9 is fine on the iGPU/CPU.
   std::env::set_var(
     "GST_PLUGIN_FEATURE_RANK",
-    "nvvp9dec:NONE,nvvp9sldec:NONE,nvvp8dec:NONE,nvvp8sldec:NONE,vaapivp9dec:NONE,vaapidecodebin:NONE",
+    "nvvp9dec:NONE,nvvp9sldec:NONE,nvvp8dec:NONE,nvvp8sldec:NONE,vaapivp9dec:NONE,vaapidecodebin:NONE,vp9alphadecodebin:MAX",
   );
   if std::env::var_os("WAYLAND_DISPLAY").is_some() {
     // linuxdeploy-plugin-gtk exports GDK_BACKEND=x11 before our binary starts

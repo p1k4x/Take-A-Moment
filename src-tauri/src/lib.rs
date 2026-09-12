@@ -594,6 +594,7 @@ impl Runtime {
       .title("Take A Moment")
       .decorations(false)
       .transparent(true)
+      .background_color((0, 0, 0, 0).into())
       .always_on_top(true)
       .skip_taskbar(true)
       .resizable(false)
@@ -620,6 +621,12 @@ impl Runtime {
   fn show_overlay_windows(&self) {
     for (_, window) in self.app.webview_windows() {
       if window.label().starts_with("overlay-") {
+        // GNOME/Mutter and other Wayland compositors force xdg_toplevel
+        // fullscreen surfaces opaque (black). Fat Cat alpha and the enter/exit
+        // holes need a real transparent window — TMP-16. Cover the monitor
+        // with the already-sized always-on-top window instead.
+        // mutter#2520 / wayland-protocols#116
+        #[cfg(not(target_os = "linux"))]
         let _ = window.set_fullscreen(true);
         let _ = window.show();
         let _ = window.set_focus();

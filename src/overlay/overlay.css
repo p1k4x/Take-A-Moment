@@ -1,7 +1,10 @@
-/* Override the body background for the transparent overlay window.
-   Without this, the body colour shows through when no break is active. */
-body {
+/* Override tokens.css so the overlay window can punch through to the desktop.
+   html/#root also need it — WebKitGTK composites those as black otherwise. */
+html,
+body,
+#root {
   background: transparent !important;
+  height: 100%;
 }
 
 @keyframes aurora-pulse {
